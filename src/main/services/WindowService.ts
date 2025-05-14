@@ -198,8 +198,13 @@ export class WindowService {
       // 当按下Escape键且窗口处于全屏状态时退出全屏
       if (input.key === 'Escape' && !input.alt && !input.control && !input.meta && !input.shift) {
         if (mainWindow.isFullScreen()) {
-          event.preventDefault()
-          mainWindow.setFullScreen(false)
+          // 获取 shortcuts 配置
+          const shortcuts = configManager.getShortcuts()
+          const exitFullscreenShortcut = shortcuts.find((s) => s.key === 'exit_fullscreen')
+          if (exitFullscreenShortcut?.enabled) {
+            event.preventDefault()
+            mainWindow.setFullScreen(false)
+          }
         }
       }
     })

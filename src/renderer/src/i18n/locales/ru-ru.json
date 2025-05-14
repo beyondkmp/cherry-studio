@@ -1148,6 +1148,7 @@
       "display.sidebar.visible": "Показывать иконки",
       "display.title": "Настройки отображения",
       "display.topic.title": "Настройки топиков",
+      "display.allowEscToExitFullscreen": "Разрешить выход из полноэкранного режима клавишей ESC",
       "miniapps": {
         "title": "Настройки мини-приложений",
         "disabled": "Скрытые мини-приложения",
@@ -1525,6 +1526,7 @@
         "clear_shortcut": "Очистить сочетание клавиш",
         "clear_topic": "Очистить все сообщения",
         "copy_last_message": "Копировать последнее сообщение",
+        "exit_fullscreen": "Выйти из полноэкранного режима",
         "key": "Клавиша",
         "mini_window": "Быстрый помощник",
         "new_topic": "Новый топик",
