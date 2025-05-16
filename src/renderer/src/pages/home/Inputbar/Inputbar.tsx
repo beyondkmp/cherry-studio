@@ -587,12 +587,25 @@ const Inputbar: FC<Props> = ({ assistant: _assistant, setActiveTopic, topic }) =
           if (file.path === '') {
             // 图像生成也支持图像编辑
             if (file.type.startsWith('image/') && (isVisionModel(model) || isGenerateImageModel(model))) {
-              const tempFilePath = await window.api.file.create(file.name)
+              const originalName = file.name || `pasted_image.${file.type.split('/')[1]}`
+              // 使用安全的文件名创建临时文件
+              const safeFileName = encodeURIComponent(originalName).replace(/%/g, '_')
+              const tempFilePath = await window.api.file.create(safeFileName)
               const arrayBuffer = await file.arrayBuffer()
               const uint8Array = new Uint8Array(arrayBuffer)
               await window.api.file.write(tempFilePath, uint8Array)
               const selectedFile = await window.api.file.get(tempFilePath)
-              selectedFile && setFiles((prevFiles) => [...prevFiles, selectedFile])
+
+              if (selectedFile) {
+                // 保留原始文件名，确保中文正确显示
+                selectedFile.origin_name = originalName
+                selectedFile.name = originalName
+                // 添加原始名称的元数据
+                if (!selectedFile.metadata) selectedFile.metadata = {}
+                selectedFile.metadata.originalName = originalName
+                setFiles((prevFiles) => [...prevFiles, selectedFile])
+                Logger.log('Successfully processed pasted image with name:', originalName)
+              }
               break
             } else {
               window.message.info({
@@ -623,10 +636,22 @@ const Inputbar: FC<Props> = ({ assistant: _assistant, setActiveTopic, topic }) =
         // 长文本直接转文件，阻止默认粘贴
         event.preventDefault()
 
-        const tempFilePath = await window.api.file.create('pasted_text.txt')
+        // 使用安全的文件名
+        const originalName = 'pasted_text.txt'
+        const tempFilePath = await window.api.file.create(originalName)
         await window.api.file.write(tempFilePath, clipboardText)
         const selectedFile = await window.api.file.get(tempFilePath)
-        selectedFile && setFiles((prevFiles) => [...prevFiles, selectedFile])
+
+        if (selectedFile) {
+          // 保留原始文件名，使用更有意义的名称
+          selectedFile.origin_name = originalName
+          selectedFile.name = originalName
+          // 添加原始名称的元数据
+          if (!selectedFile.metadata) selectedFile.metadata = {}
+          selectedFile.metadata.originalName = originalName
+          setFiles((prevFiles) => [...prevFiles, selectedFile])
+          Logger.log('Successfully processed pasted text file')
+        }
         setText(text) // 保持输入框内容不变
         setTimeout(() => resizeTextArea(), 50)
         return
@@ -640,23 +665,88 @@ const Inputbar: FC<Props> = ({ assistant: _assistant, setActiveTopic, topic }) =
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
   }
 
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
+    setIsDragging(false)
 
-    const files = await getFilesFromDropEvent(e).catch((err) => {
-      Logger.error('[src/renderer/src/pages/home/Inputbar/Inputbar.tsx] handleDrop:', err)
-      return null
-    })
+    Logger.log(`处理拖放事件: items=${e.dataTransfer.items.length}, files=${e.dataTransfer.files.length}`)
 
-    if (files) {
-      files.forEach((file) => {
-        if (supportExts.includes(getFileExtension(file.path))) {
-          setFiles((prevFiles) => [...prevFiles, file])
-        }
+    try {
+      // 从getFilesFromDropEvent获取文件
+      const droppedFiles = await getFilesFromDropEvent(e).catch((err) => {
+        Logger.error('[src/renderer/src/pages/home/Inputbar/Inputbar.tsx] handleDrop:', err)
+        return null
       })
+
+      if (!droppedFiles || droppedFiles.length === 0) {
+        Logger.log('没有获取到任何有效文件')
+        return
+      }
+
+      Logger.log(`成功获取 ${droppedFiles.length} 个文件`)
+
+      // 过滤出支持的文件类型
+      const validFiles: FileType[] = []
+
+      for (const file of droppedFiles) {
+        const fileExt = getFileExtension(file.path)
+        Logger.log(`检查文件: ${file.name}, 路径: ${file.path}, 扩展名: ${fileExt}`)
+
+        if (supportExts.includes(fileExt)) {
+          validFiles.push(file)
+          Logger.log(`文件 ${file.name} 支持，已添加`)
+        } else {
+          Logger.log(`文件 ${file.name} 不支持，扩展名: ${fileExt}`)
+          window.message.info({
+            key: 'file_not_supported',
+            content: t('chat.input.file_not_supported')
+          })
+        }
+      }
+
+      if (validFiles.length === 0) {
+        Logger.log('没有找到有效的文件类型')
+        return
+      }
+
+      Logger.log(`添加 ${validFiles.length} 个文件到UI`)
+
+      // 更新文件列表
+      setFiles((prevFiles) => {
+        const newFiles = [...prevFiles, ...validFiles]
+        Logger.log(`更新后的文件状态: ${newFiles.length} 个文件`)
+        return newFiles
+      })
+
+      // 确保UI更新
+      window.requestAnimationFrame(() => {
+        // 强制UI更新
+        resizeTextArea()
+
+        // 设置焦点
+        textareaRef.current?.focus()
+
+        // 显示成功消息
+        window.message.success({
+          key: 'file_added',
+          content: t('chat.input.file_added_success')
+        })
+
+        // 检查文件是否实际添加成功
+        Logger.log('附件已添加，请检查文件是否显示')
+      })
+    } catch (error) {
+      Logger.error('处理拖放文件时出错:', error)
     }
   }
 
@@ -872,14 +962,18 @@ const Inputbar: FC<Props> = ({ assistant: _assistant, setActiveTopic, topic }) =
   const showThinkingButton = isSupportedThinkingTokenModel(model) || isSupportedReasoningEffortModel(model)
 
   return (
-    <Container onDragOver={handleDragOver} onDrop={handleDrop} className="inputbar">
+    <Container
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={classNames('inputbar', isDragging && 'dragging')}>
       <NarrowLayout style={{ width: '100%' }}>
         <QuickPanelView setInputText={setText} />
         <InputBarContainer
           id="inputbar"
-          className={classNames('inputbar-container', inputFocus && 'focus')}
+          className={classNames('inputbar-container', inputFocus && 'focus', isDragging && 'dragging')}
           ref={containerRef}>
-          {files.length > 0 && <AttachmentPreview files={files} setFiles={setFiles} />}
+          {files && files.length > 0 && <AttachmentPreview files={files} setFiles={setFiles} />}
           {selectedKnowledgeBases.length > 0 && (
             <KnowledgeBaseInput
               selectedKnowledgeBases={selectedKnowledgeBases}
@@ -1047,6 +1141,18 @@ const Container = styled.div`
   flex-direction: column;
   position: relative;
   z-index: 2;
+
+  &.dragging::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.05);
+    pointer-events: none;
+    z-index: 10;
+  }
 `
 
 const InputBarContainer = styled.div`
@@ -1058,6 +1164,12 @@ const InputBarContainer = styled.div`
   border-radius: 15px;
   padding-top: 6px; // 为拖动手柄留出空间
   background-color: var(--color-background-opacity);
+
+  &.dragging {
+    border: 2px dashed var(--color-primary);
+    background-color: var(--color-background-soft);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  }
 `
 
 const TextareaStyle: CSSProperties = {

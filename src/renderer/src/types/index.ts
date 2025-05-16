@@ -275,6 +275,10 @@ export interface FileType {
   created_at: string
   count: number
   tokens?: number
+  metadata?: {
+    originalName?: string
+    [key: string]: any
+  }
 }
 
 export enum FileTypes {

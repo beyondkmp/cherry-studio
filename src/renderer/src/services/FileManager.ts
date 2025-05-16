@@ -125,21 +125,32 @@ class FileManager {
   }
 
   static formatFileName(file: FileType) {
-    if (!file || !file.origin_name) {
+    if (!file) {
       return ''
+    }
+
+    // 使用元数据中保存的原始名称，以确保中文正确显示
+    if (file.metadata && file.metadata.originalName) {
+      return file.metadata.originalName
+    }
+
+    // 如果有origin_name且不是临时文件前缀，直接使用
+    if (file.origin_name && !file.origin_name.startsWith('temp_file_')) {
+      return file.origin_name
     }
 
     const date = dayjs(file.created_at).format('YYYY-MM-DD')
 
-    if (file.origin_name.includes('pasted_text')) {
+    if (file.origin_name && file.origin_name.includes('pasted_text')) {
       return date + ' ' + i18n.t('message.attachments.pasted_text') + file.ext
     }
 
-    if (file.origin_name.startsWith('temp_file') && file.origin_name.includes('image')) {
+    if (file.origin_name && (file.origin_name.startsWith('temp_file') || file.origin_name.includes('image'))) {
       return date + ' ' + i18n.t('message.attachments.pasted_image') + file.ext
     }
 
-    return file.origin_name
+    // 回退到名称或ID
+    return file.name || file.origin_name || file.id + file.ext
   }
 }
 
