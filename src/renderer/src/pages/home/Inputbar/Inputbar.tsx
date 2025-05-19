@@ -651,6 +651,28 @@ const Inputbar: FC<Props> = ({ assistant: _assistant, setActiveTopic, topic }) =
     [model, pasteLongTextAsFile, pasteLongTextThreshold, resizeTextArea, supportExts, t, text]
   )
 
+  useEffect(() => {
+    const handleGlobalPaste = (event: ClipboardEvent) => {
+      // Skip if editing anywhere (input, textarea, or contenteditable)
+      const active = document.activeElement as HTMLElement
+      if (
+        active === textareaRef.current?.resizableTextArea?.textArea ||
+        active?.isContentEditable ||
+        active?.tagName === 'INPUT' ||
+        active?.tagName === 'TEXTAREA'
+      ) {
+        return
+      }
+
+      onPaste(event)
+    }
+
+    document.addEventListener('paste', handleGlobalPaste)
+    return () => {
+      document.removeEventListener('paste', handleGlobalPaste)
+    }
+  }, [onPaste])
+
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
