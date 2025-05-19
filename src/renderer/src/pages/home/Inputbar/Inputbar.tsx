@@ -23,6 +23,7 @@ import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
 import FileManager from '@renderer/services/FileManager'
 import { checkRateLimit, getUserMessage } from '@renderer/services/MessagesService'
 import { getModelUniqId } from '@renderer/services/ModelService'
+import PasteService from '@renderer/services/PasteService'
 import { estimateTextTokens as estimateTxtTokens, estimateUserPromptUsage } from '@renderer/services/TokenService'
 import { translateText } from '@renderer/services/TranslateService'
 import WebSearchService from '@renderer/services/WebSearchService'
@@ -581,97 +582,53 @@ const Inputbar: FC<Props> = ({ assistant: _assistant, setActiveTopic, topic }) =
 
   const onPaste = useCallback(
     async (event: ClipboardEvent) => {
-      // 优先处理文本粘贴
-      const clipboardText = event.clipboardData?.getData('text')
-      if (clipboardText) {
-        // 1. 文本粘贴
-        if (pasteLongTextAsFile && clipboardText.length > pasteLongTextThreshold) {
-          // 长文本直接转文件，阻止默认粘贴
-          event.preventDefault()
-
+      await PasteService.handleFilePaste(
+        event,
+        isVision,
+        isGenerateImageModel(model),
+        supportExts,
+        setFiles,
+        async (text) => {
           const tempFilePath = await window.api.file.create('pasted_text.txt')
-          await window.api.file.write(tempFilePath, clipboardText)
+          await window.api.file.write(tempFilePath, text)
           const selectedFile = await window.api.file.get(tempFilePath)
-          selectedFile && setFiles((prevFiles) => [...prevFiles, selectedFile])
-          setText(text) // 保持输入框内容不变
+          if (selectedFile) setFiles((prevFiles) => [...prevFiles, selectedFile])
           setTimeout(() => resizeTextArea(), 50)
-          return
-        }
-        // 短文本走默认粘贴行为，直接返回
-        return
-      }
-
-      // 2. 文件/图片粘贴（仅在无文本时处理）
-      if (event.clipboardData?.files && event.clipboardData.files.length > 0) {
-        event.preventDefault()
-        for (const file of event.clipboardData.files) {
-          try {
-            // 使用新的API获取文件路径
-            const filePath = window.api.file.getPathForFile(file)
-
-            // 如果没有路径，可能是剪贴板中的图像数据
-            if (!filePath) {
-              // 图像生成也支持图像编辑
-              if (file.type.startsWith('image/') && (isVisionModel(model) || isGenerateImageModel(model))) {
-                const tempFilePath = await window.api.file.create(file.name)
-                const arrayBuffer = await file.arrayBuffer()
-                const uint8Array = new Uint8Array(arrayBuffer)
-                await window.api.file.write(tempFilePath, uint8Array)
-                const selectedFile = await window.api.file.get(tempFilePath)
-                selectedFile && setFiles((prevFiles) => [...prevFiles, selectedFile])
-                break
-              } else {
-                window.message.info({
-                  key: 'file_not_supported',
-                  content: t('chat.input.file_not_supported')
-                })
-              }
-              continue
-            }
-
-            // 有路径的情况
-            if (supportExts.includes(getFileExtension(filePath))) {
-              const selectedFile = await window.api.file.get(filePath)
-              selectedFile && setFiles((prevFiles) => [...prevFiles, selectedFile])
-            } else {
-              window.message.info({
-                key: 'file_not_supported',
-                content: t('chat.input.file_not_supported')
-              })
-            }
-          } catch (error) {
-            Logger.error('[src/renderer/src/pages/home/Inputbar/Inputbar.tsx] onPaste:', error)
-            window.message.error(t('chat.input.file_error'))
-          }
-        }
-        return
-      }
-      // 其他情况默认粘贴
+        },
+        pasteLongTextAsFile,
+        pasteLongTextThreshold
+      )
     },
-    [model, pasteLongTextAsFile, pasteLongTextThreshold, resizeTextArea, supportExts, t, text]
+    [isVision, model, pasteLongTextAsFile, pasteLongTextThreshold, resizeTextArea, supportExts]
   )
 
+  // 使用PasteService注册paste处理器
   useEffect(() => {
-    const handleGlobalPaste = (event: ClipboardEvent) => {
-      // Skip if editing anywhere (input, textarea, or contenteditable)
-      const active = document.activeElement as HTMLElement
-      if (
-        active === textareaRef.current?.resizableTextArea?.textArea ||
-        active?.isContentEditable ||
-        active?.tagName === 'INPUT' ||
-        active?.tagName === 'TEXTAREA'
-      ) {
-        return
-      }
+    const unregister = PasteService.registerPasteHandler(
+      'inputbar',
+      onPaste,
+      isVision,
+      true // 将Inputbar设置为默认处理器
+    )
 
-      onPaste(event)
-    }
-
-    document.addEventListener('paste', handleGlobalPaste)
     return () => {
-      document.removeEventListener('paste', handleGlobalPaste)
+      unregister()
     }
-  }, [onPaste])
+  }, [isVision, onPaste])
+
+  // 修改handleFocus，使用PasteService
+  const handleFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    setInputFocus(true)
+    PasteService.setActiveHandler('inputbar')
+    if (e.target.value.length === 0) {
+      e.target.setSelectionRange(0, 0)
+    }
+  }
+
+  const handleBlur = () => {
+    setInputFocus(false)
+    // 不重置活跃处理器，让Inputbar作为默认处理器持续存在
+  }
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -971,13 +928,8 @@ const Inputbar: FC<Props> = ({ assistant: _assistant, setActiveTopic, topic }) =
               minHeight: textareaHeight ? `${textareaHeight}px` : undefined
             }}
             styles={{ textarea: TextareaStyle }}
-            onFocus={(e: React.FocusEvent<HTMLTextAreaElement>) => {
-              setInputFocus(true)
-              if (e.target.value.length === 0) {
-                e.target.setSelectionRange(0, 0)
-              }
-            }}
-            onBlur={() => setInputFocus(false)}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
             onInput={onInput}
             disabled={searching}
             onPaste={(e) => onPaste(e.nativeEvent)}

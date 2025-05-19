@@ -4,6 +4,7 @@ import { isGenerateImageModel, isVisionModel } from '@renderer/config/models'
 import { useAssistant } from '@renderer/hooks/useAssistant'
 import { useSettings } from '@renderer/hooks/useSettings'
 import FileManager from '@renderer/services/FileManager'
+import PasteService from '@renderer/services/PasteService'
 import { FileType, FileTypes } from '@renderer/types'
 import { Message, MessageBlock, MessageBlockStatus, MessageBlockType } from '@renderer/types/newMessage'
 import { classNames, getFileExtension } from '@renderer/utils'
@@ -44,6 +45,14 @@ const MessageBlockEditor: FC<Props> = ({ message, onSave, onResend, onCancel }) 
   const textareaRef = useRef<TextAreaRef>(null)
   const attachmentButtonRef = useRef<AttachmentButtonRef>(null)
 
+  const resizeTextArea = useCallback(() => {
+    const textArea = textareaRef.current?.resizableTextArea?.textArea
+    if (textArea) {
+      textArea.style.height = 'auto'
+      textArea.style.height = textArea?.scrollHeight > 400 ? '400px' : `${textArea?.scrollHeight}px`
+    }
+  }, [])
+
   useEffect(() => {
     setTimeout(() => {
       resizeTextArea()
@@ -54,13 +63,41 @@ const MessageBlockEditor: FC<Props> = ({ message, onSave, onResend, onCancel }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const resizeTextArea = useCallback(() => {
-    const textArea = textareaRef.current?.resizableTextArea?.textArea
-    if (textArea) {
-      textArea.style.height = 'auto'
-      textArea.style.height = textArea?.scrollHeight > 400 ? '400px' : `${textArea?.scrollHeight}px`
+  const onPaste = useCallback(
+    async (event: ClipboardEvent) => {
+      await PasteService.handleFilePaste(
+        event,
+        isVisionModel(model),
+        isGenerateImageModel(model),
+        supportExts,
+        setFiles,
+        async (text) => {
+          const tempFilePath = await window.api.file.create('pasted_text.txt')
+          await window.api.file.write(tempFilePath, text)
+          const selectedFile = await window.api.file.get(tempFilePath)
+          if (selectedFile) setFiles((prevFiles) => [...prevFiles, selectedFile])
+          setTimeout(() => resizeTextArea(), 50)
+        },
+        pasteLongTextAsFile,
+        pasteLongTextThreshold
+      )
+    },
+    [model, pasteLongTextAsFile, pasteLongTextThreshold, resizeTextArea, supportExts]
+  )
+
+  useEffect(() => {
+    const unregister = PasteService.registerPasteHandler(
+      `message-editor-${message.id}`,
+      onPaste,
+      isVisionModel(model),
+      false
+    )
+
+    return () => {
+      unregister()
+      PasteService.resetToDefaultHandler()
     }
-  }, [])
+  }, [message.id, model, onPaste])
 
   const handleTextChange = (blockId: string, content: string) => {
     setEditedBlocks((prev) => prev.map((block) => (block.id === blockId ? { ...block, content } : block)))
@@ -74,12 +111,14 @@ const MessageBlockEditor: FC<Props> = ({ message, onSave, onResend, onCancel }) 
     setTimeout(() => resizeTextArea(), 0)
   }
 
-  // 处理文件删除
   const handleFileRemove = async (blockId: string) => {
     setEditedBlocks((prev) => prev.filter((block) => block.id !== blockId))
   }
 
-  // 处理拖拽上传
+  const handleFocus = () => {
+    PasteService.setActiveHandler(`message-editor-${message.id}`)
+  }
+
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
@@ -98,7 +137,6 @@ const MessageBlockEditor: FC<Props> = ({ message, onSave, onResend, onCancel }) 
         }
       })
 
-      // 如果有文件，但都不支持
       if (files.length > 0 && supportedFiles === 0) {
         window.message.info({
           key: 'file_not_supported',
@@ -124,6 +162,7 @@ const MessageBlockEditor: FC<Props> = ({ message, onSave, onResend, onCancel }) 
         }
       })
     }
+    PasteService.resetToDefaultHandler()
     if (withResend) {
       onResend(updatedBlocks)
     } else {
@@ -131,71 +170,15 @@ const MessageBlockEditor: FC<Props> = ({ message, onSave, onResend, onCancel }) 
     }
   }
 
-  const onPaste = useCallback(
-    async (event: ClipboardEvent) => {
-      // 1. 文本粘贴
-      const clipboardText = event.clipboardData?.getData('text')
-      if (clipboardText) {
-        if (pasteLongTextAsFile && clipboardText.length > pasteLongTextThreshold) {
-          // 长文本直接转文件，阻止默认粘贴
-          event.preventDefault()
-
-          const tempFilePath = await window.api.file.create('pasted_text.txt')
-          await window.api.file.write(tempFilePath, clipboardText)
-          const selectedFile = await window.api.file.get(tempFilePath)
-          selectedFile && setFiles((prevFiles) => [...prevFiles, selectedFile])
-          setTimeout(() => resizeTextArea(), 50)
-          return
-        }
-        // 短文本走默认粘贴行为，直接返回
-        return
-      }
-
-      // 2. 文件/图片粘贴
-      if (event.clipboardData?.files && event.clipboardData.files.length > 0) {
-        event.preventDefault()
-        for (const file of event.clipboardData.files) {
-          const filePath = window.api.file.getPathForFile(file)
-          if (!filePath) {
-            // 图像生成也支持图像编辑
-            if (file.type.startsWith('image/') && (isVisionModel(model) || isGenerateImageModel(model))) {
-              const tempFilePath = await window.api.file.create(file.name)
-              const arrayBuffer = await file.arrayBuffer()
-              const uint8Array = new Uint8Array(arrayBuffer)
-              await window.api.file.write(tempFilePath, uint8Array)
-              const selectedFile = await window.api.file.get(tempFilePath)
-              selectedFile && setFiles((prevFiles) => [...prevFiles, selectedFile])
-              break
-            } else {
-              window.message.info({
-                key: 'file_not_supported',
-                content: t('chat.input.file_not_supported')
-              })
-            }
-          }
-
-          if (supportExts.includes(getFileExtension(filePath))) {
-            const selectedFile = await window.api.file.get(filePath)
-            selectedFile && setFiles((prevFiles) => [...prevFiles, selectedFile])
-          } else {
-            window.message.info({
-              key: 'file_not_supported',
-              content: t('chat.input.file_not_supported')
-            })
-          }
-        }
-        return
-      }
-
-      // 短文本走默认粘贴行为
-    },
-    [model, pasteLongTextAsFile, pasteLongTextThreshold, resizeTextArea, supportExts, t]
-  )
-
   const autoResizeTextArea = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const textarea = e.target
     textarea.style.height = 'auto'
     textarea.style.height = `${textarea.scrollHeight}px`
+  }
+
+  const handleCancel = () => {
+    PasteService.resetToDefaultHandler()
+    onCancel()
   }
 
   return (
@@ -205,7 +188,7 @@ const MessageBlockEditor: FC<Props> = ({ message, onSave, onResend, onCancel }) 
           .filter((block) => block.type === MessageBlockType.MAIN_TEXT)
           .map((block) => (
             <Textarea
-              className={classNames(isFileDragging && 'file-dragging')}
+              className={classNames('editing-message', isFileDragging && 'file-dragging')}
               key={block.id}
               ref={textareaRef}
               variant="borderless"
@@ -214,6 +197,7 @@ const MessageBlockEditor: FC<Props> = ({ message, onSave, onResend, onCancel }) 
                 handleTextChange(block.id, e.target.value)
                 autoResizeTextArea(e)
               }}
+              onFocus={handleFocus}
               autoFocus
               contextMenu="true"
               spellCheck={false}
@@ -270,7 +254,7 @@ const MessageBlockEditor: FC<Props> = ({ message, onSave, onResend, onCancel }) 
           <ActionBarMiddle />
           <ActionBarRight>
             <Tooltip title={t('common.cancel')}>
-              <ToolbarButton type="text" onClick={onCancel}>
+              <ToolbarButton type="text" onClick={handleCancel}>
                 <X size={16} />
               </ToolbarButton>
             </Tooltip>
