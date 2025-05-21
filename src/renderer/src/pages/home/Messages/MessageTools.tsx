@@ -34,7 +34,6 @@ const MessageTools: FC<Props> = ({ blocks }) => {
       return 'Invalid Result'
     }
   }, [toolResponse])
-  const { renderedMarkdown: styledResult } = useShikiWithMarkdownIt(`\`\`\`json\n${resultString}\n\`\`\``)
 
   if (!toolResponse) {
     return null
@@ -54,8 +53,6 @@ const MessageTools: FC<Props> = ({ blocks }) => {
   // Format tool responses for collapse items
   const getCollapseItems = () => {
     const items: { key: string; label: React.ReactNode; children: React.ReactNode }[] = []
-    // Add tool responses
-    // for (const toolResponse of toolResponses) {
     const { id, tool, status, response } = toolResponse
     const isInvoking = status === 'invoking'
     const isDone = status === 'done'
@@ -122,11 +119,10 @@ const MessageTools: FC<Props> = ({ blocks }) => {
             fontFamily: messageFont === 'serif' ? 'var(--font-family-serif)' : 'var(--font-family)',
             fontSize: '12px'
           }}>
-          <div className="markdown" dangerouslySetInnerHTML={{ __html: styledResult }} />
+          <CollapsedContent isExpanded={activeKeys.includes(id)} resultString={resultString} />
         </ToolResponseContainer>
       )
     })
-    // }
 
     return items
   }
@@ -139,7 +135,6 @@ const MessageTools: FC<Props> = ({ blocks }) => {
       switch (parsedResult.content[0]?.type) {
         case 'text':
           return <PreviewBlock>{parsedResult.content[0].text}</PreviewBlock>
-        // TODO: support other types
         default:
           return <PreviewBlock>{content}</PreviewBlock>
       }
@@ -177,7 +172,6 @@ const MessageTools: FC<Props> = ({ blocks }) => {
               fontFamily: messageFont === 'serif' ? 'var(--font-family-serif)' : 'var(--font-family)',
               fontSize
             }}>
-            {/* mode swtich tabs */}
             <Tabs
               tabBarExtraContent={
                 <ActionButton
@@ -198,12 +192,17 @@ const MessageTools: FC<Props> = ({ blocks }) => {
                 {
                   key: 'preview',
                   label: t('message.tools.preview'),
-                  children: renderPreview(expandedResponse.content)
+                  children: (
+                    <CollapsedContent
+                      isExpanded={true}
+                      resultString={resultString}
+                    />
+                  )
                 },
                 {
                   key: 'raw',
                   label: t('message.tools.raw'),
-                  children: <div className="markdown" dangerouslySetInnerHTML={{ __html: styledResult }} />
+                  children: renderPreview(expandedResponse.content)
                 }
               ]}
             />
@@ -212,6 +211,19 @@ const MessageTools: FC<Props> = ({ blocks }) => {
       </Modal>
     </>
   )
+}
+
+// New component to handle collapsed content
+const CollapsedContent: FC<{ isExpanded: boolean; resultString: string }> = ({ isExpanded, resultString }) => {
+  const { renderedMarkdown: styledResult } = useShikiWithMarkdownIt(
+    isExpanded ? `\`\`\`json\n${resultString}\n\`\`\`` : ''
+  )
+
+  if (!isExpanded) {
+    return null
+  }
+
+  return <MarkdownContainer className="markdown" dangerouslySetInnerHTML={{ __html: styledResult }} />
 }
 
 const CollapseContainer = styled(Collapse)`
@@ -231,6 +243,12 @@ const CollapseContainer = styled(Collapse)`
 
   .ant-collapse-content-box {
     padding: 0 !important;
+  }
+`
+
+const MarkdownContainer = styled.div`
+  & pre span {
+    white-space: pre-wrap;
   }
 `
 
