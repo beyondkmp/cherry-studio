@@ -9,19 +9,22 @@ import { useAssistants, useDefaultAssistant, useDefaultModel } from '@renderer/h
 import { useProviders } from '@renderer/hooks/useProvider'
 import { useSettings } from '@renderer/hooks/useSettings'
 import { getModelUniqId, hasModel } from '@renderer/services/ModelService'
-import { useAppSelector } from '@renderer/store'
+import store, { useAppSelector } from '@renderer/store'
 import { useAppDispatch } from '@renderer/store'
-import { setQuickAssistantId } from '@renderer/store/llm'
+import { setQuickAssistantId, updateProvider } from '@renderer/store/llm'
 import { setTranslateModelPrompt } from '@renderer/store/settings'
-import { Model } from '@renderer/types'
+import { Model, Provider } from '@renderer/types'
+import { IpcChannel } from '@shared/IpcChannel'
 import { Button, Select, Tooltip } from 'antd'
 import { find, sortBy } from 'lodash'
 import { CircleHelp, FolderPen, Languages, MessageSquareMore, Rocket, Settings2 } from 'lucide-react'
-import { FC, useMemo } from 'react'
+import { FC, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
+import Logger from '@renderer/config/logger'
 
 import { SettingContainer, SettingDescription, SettingGroup, SettingTitle } from '..'
+import AddModelPopup from '../ProviderSettings/AddModelPopup'
 import DefaultAssistantSettings from './DefaultAssistantSettings'
 import TopicNamingModalPopup from './TopicNamingModalPopup'
 
@@ -38,6 +41,32 @@ const ModelSettings: FC = () => {
 
   const dispatch = useAppDispatch()
   const { quickAssistantId } = useAppSelector((state) => state.llm)
+
+  useEffect(() => {
+    const handleProviderAddKey = (_event: any, data: { id: string; apiKey: string }) => {
+      Logger.info('Received provider key data in ModelSettings (one-time setup):', data)
+      const { id, apiKey } = data
+      if (id === 'tokenflux') {
+        if (apiKey) {
+          dispatch(updateProvider({ id, apiKey } as Provider))
+          window.message.success(t('Provider API key updated'))
+          Logger.info('Provider API key updated in ModelSettings for:', id)
+
+          const currentProviders = store.getState().llm.providers
+          const providerToUpdate = currentProviders.find((p) => p.id === id)
+          if (providerToUpdate) {
+            AddModelPopup.show({ title: t('settings.models.add.add_model'), provider: providerToUpdate })
+          } else {
+            Logger.warn(`Provider with id ${id} not found after API key update.`)
+          }
+        } else {
+          Logger.warn('Provider_AddKey event received for tokenflux without apiKey in ModelSettings')
+        }
+      }
+    }
+
+    window.electron.ipcRenderer.on(IpcChannel.Provider_AddKey, handleProviderAddKey)
+  }, [])
 
   const selectOptions = providers
     .filter((p) => p.models.length > 0)
