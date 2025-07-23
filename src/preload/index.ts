@@ -367,6 +367,19 @@ const api = {
     pinActionWindow: (isPinned: boolean) => ipcRenderer.invoke(IpcChannel.Selection_ActionWindowPin, isPinned)
   },
   quoteToMainWindow: (text: string) => ipcRenderer.invoke(IpcChannel.App_QuoteToMain, text),
+  contextMenu: {
+    handleClick: (menuItemId: string, data?: any) =>
+      ipcRenderer.invoke(IpcChannel.ContextMenu_HandleClick, menuItemId, data),
+    onReceiveData: (callback: (data: any) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: any) => {
+        callback(data)
+      }
+      ipcRenderer.on('context-menu-data', listener)
+      return () => {
+        ipcRenderer.off('context-menu-data', listener)
+      }
+    }
+  },
   setDisableHardwareAcceleration: (isDisable: boolean) =>
     ipcRenderer.invoke(IpcChannel.App_SetDisableHardwareAcceleration, isDisable),
   trace: {

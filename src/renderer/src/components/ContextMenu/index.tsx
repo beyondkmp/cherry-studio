@@ -1,59 +1,18 @@
-import { Dropdown } from 'antd'
-import { useMemo, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import React from 'react'
 
 interface ContextMenuProps {
-  children: React.ReactNode
+  children?: React.ReactNode
 }
 
+/**
+ * 上下文菜单包装器组件
+ * 注意：实际的全局右键菜单功能已经迁移到 GlobalContextMenu 组件
+ * 这个组件保持向后兼容性
+ */
 const ContextMenu: React.FC<ContextMenuProps> = ({ children }) => {
-  const { t } = useTranslation()
-  const [selectedText, setSelectedText] = useState<string | undefined>(undefined)
-
-  const contextMenuItems = useMemo(() => {
-    if (!selectedText) return []
-
-    return [
-      {
-        key: 'copy',
-        label: t('common.copy'),
-        onClick: () => {
-          if (selectedText) {
-            navigator.clipboard
-              .writeText(selectedText)
-              .then(() => {
-                window.message.success({ content: t('message.copied'), key: 'copy-message' })
-              })
-              .catch(() => {
-                window.message.error({ content: t('message.copy.failed'), key: 'copy-message-failed' })
-              })
-          }
-        }
-      },
-      {
-        key: 'quote',
-        label: t('chat.message.quote'),
-        onClick: () => {
-          if (selectedText) {
-            window.api?.quoteToMainWindow(selectedText)
-          }
-        }
-      }
-    ]
-  }, [selectedText, t])
-
-  const onOpenChange = (open: boolean) => {
-    if (open) {
-      const selectedText = window.getSelection()?.toString()
-      setSelectedText(selectedText)
-    }
-  }
-
-  return (
-    <Dropdown onOpenChange={onOpenChange} menu={{ items: contextMenuItems }} trigger={['contextMenu']}>
-      {children}
-    </Dropdown>
-  )
+  // 这个组件现在只是一个透明的包装器
+  // 实际的右键菜单功能由 GlobalContextMenu 处理
+  return <>{children}</>
 }
 
 export default ContextMenu

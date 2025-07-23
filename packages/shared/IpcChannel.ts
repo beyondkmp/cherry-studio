@@ -259,6 +259,9 @@ export enum IpcChannel {
   Memory_DeleteAllMemoriesForUser = 'memory:delete-all-memories-for-user',
   Memory_GetUsersList = 'memory:get-users-list',
 
+  // Context Menu
+  ContextMenu_HandleClick = 'context-menu:handle-click',
+
   // TRACE
   TRACE_SAVE_DATA = 'trace:saveData',
   TRACE_GET_DATA = 'trace:getData',

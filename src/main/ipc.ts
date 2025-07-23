@@ -17,6 +17,7 @@ import appService from './services/AppService'
 import AppUpdater from './services/AppUpdater'
 import BackupManager from './services/BackupManager'
 import { configManager } from './services/ConfigManager'
+import { contextMenu } from './services/ContextMenu'
 import CopilotService from './services/CopilotService'
 import DxtService from './services/DxtService'
 import { ExportService } from './services/ExportService'
@@ -621,6 +622,13 @@ export function registerIpc(mainWindow: BrowserWindow, app: Electron.App) {
   // nutstore
   ipcMain.handle(IpcChannel.Nutstore_GetSsoUrl, NutstoreService.getNutstoreSSOUrl.bind(NutstoreService))
   ipcMain.handle(IpcChannel.Nutstore_DecryptToken, (_, token: string) => NutstoreService.decryptToken(token))
+
+  // context menu
+  ipcMain.handle(IpcChannel.ContextMenu_HandleClick, (event, menuItemId: string, data?: any) => {
+    const webContents = event.sender
+    contextMenu.handleMenuItemClick(webContents, menuItemId, data)
+  })
+
   ipcMain.handle(IpcChannel.Nutstore_GetDirectoryContents, (_, token: string, path: string) =>
     NutstoreService.getDirectoryContents(token, path)
   )

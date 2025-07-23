@@ -154,10 +154,13 @@ export class WindowService {
   }
 
   private setupContextMenu(mainWindow: BrowserWindow) {
-    contextMenu.contextMenu(mainWindow.webContents)
-    // setup context menu for all webviews like miniapp
+    // 主窗口使用自定义右键菜单
+    contextMenu.contextMenu(mainWindow.webContents, true)
+
+    // webview 使用原生右键菜单
     app.on('web-contents-created', (_, webContents) => {
-      contextMenu.contextMenu(webContents)
+      // 对于 webview，传递 false 使用原生菜单
+      contextMenu.contextMenu(webContents, false)
     })
 
     // Dangerous API
