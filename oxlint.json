@@ -1,0 +1,35 @@
+{
+  "$schema": "https://oxc.rs/schema/oxlintrc.json",
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "out",
+    "build",
+    "*.config.js",
+    "*.config.ts",
+    "*.spec.ts",
+    "*.test.ts",
+    "*.spec.tsx",
+    "*.test.tsx",
+    "tests",
+    ".yarn",
+    "coverage"
+  ],
+  "settings": {
+    "react": {
+      "version": "19"
+    }
+  },
+  "rules": {
+    "no-console": "off",
+    "no-unused-vars": "warn",
+    "no-undef": "error",
+    "no-debugger": "error",
+    "prefer-const": "warn"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2022": true
+  }
+}
