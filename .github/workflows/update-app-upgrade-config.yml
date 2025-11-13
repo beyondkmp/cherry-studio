@@ -5,6 +5,12 @@ on:
     types:
       - prereleased
       - released
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.2.3)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -13,20 +19,46 @@ permissions:
 jobs:
   propose-update:
     runs-on: ubuntu-latest
-    if: ${{ github.event.release &&
+    if: ${{ github.event_name == 'workflow_dispatch' || (
+      github.event_name == 'release' &&
+      github.event.release &&
       !github.event.release.draft &&
       (github.event.release.prerelease ||
         github.event.release.make_latest == 'true' ||
-        github.event.release.is_latest == true) }}
+        github.event.release.is_latest == true ||
+        github.event.release.is_latest == 'true')) }}
 
     steps:
       - name: Prepare metadata
         id: meta
         run: |
-          TAG="${{ github.event.release.tag_name }}"
+          EVENT="${{ github.event_name }}"
+          if [ "$EVENT" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+            PRE="${{ github.event.release.prerelease }}"
+            MAKE_LATEST="${{ github.event.release.make_latest }}"
+            IS_LATEST_RAW="${{ github.event.release.is_latest }}"
+            if [ "$MAKE_LATEST" = "true" ]; then
+              LATEST="true"
+            elif [ "$IS_LATEST_RAW" = "true" ] || [ "$IS_LATEST_RAW" = "True" ]; then
+              LATEST="true"
+            else
+              LATEST="false"
+            fi
+            TRIGGER="release"
+          else
+            TAG="${{ github.event.inputs.tag }}"
+            PRE="false"
+            LATEST="true"
+            TRIGGER="manual"
+          fi
+
           SAFE_TAG=$(echo "$TAG" | sed 's/[^A-Za-z0-9._-]/-/g')
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "safe_tag=$SAFE_TAG" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRE" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "trigger=$TRIGGER" >> "$GITHUB_OUTPUT"
 
       - name: Checkout default branch
         uses: actions/checkout@v5
@@ -83,10 +115,11 @@ jobs:
           commit-message: "🤖 chore: sync app-upgrade-config for ${{ steps.meta.outputs.tag }}"
           title: "chore: update app-upgrade-config for ${{ steps.meta.outputs.tag }}"
           body: |
-            Automated update triggered by release `${{ steps.meta.outputs.tag }}`.
+            Automated update triggered by `${{ steps.meta.outputs.trigger }}`.
 
             - Source tag: `${{ steps.meta.outputs.tag }}`
-            - Pre-release: `${{ github.event.release.prerelease }}`
+            - Pre-release: `${{ steps.meta.outputs.prerelease }}`
+            - Latest: `${{ steps.meta.outputs.latest }}`
             - Workflow run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           labels: |
             automation
