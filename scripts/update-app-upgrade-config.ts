@@ -475,9 +475,9 @@ async function ensureReleaseAvailability(releaseInfo: ReleaseInfo): Promise<bool
 
 function getReleasePageUrl(mirror: UpdateMirror, tag: string, channel: UpgradeChannel): string {
   if (mirror === 'github' || channel !== 'latest') {
-    return `https://github.com/CherryHQ/cherry-studio/releases/tag/${encodeURIComponent(tag)}`
+    return `https://github.com/beyondkmp/cherry-studio/releases/tag/${encodeURIComponent(tag)}`
   }
-  return `https://gitcode.com/CherryHQ/cherry-studio/releases/${encodeURIComponent(tag)}`
+  return `https://gitcode.com/beyondkmp/cherry-studio/releases/${encodeURIComponent(tag)}`
 }
 
 main().catch((error) => {
