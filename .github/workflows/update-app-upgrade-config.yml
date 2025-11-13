@@ -4,7 +4,8 @@ on:
   release:
     types:
       - published
-      - edited
+      - released
+      - prereleased
   workflow_dispatch:
     inputs:
       tag:
@@ -19,6 +20,9 @@ permissions:
 jobs:
   propose-update:
     runs-on: ubuntu-latest
+    concurrency:
+      group: update-app-upgrade-${{ github.event.release.tag_name || github.event.inputs.tag }}
+      cancel-in-progress: false
     if: |
       github.event_name == 'workflow_dispatch' || (
         github.event_name == 'release' &&
