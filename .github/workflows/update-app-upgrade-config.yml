@@ -23,16 +23,7 @@ jobs:
     concurrency:
       group: update-app-upgrade-${{ github.event.release.tag_name || github.event.inputs.tag }}
       cancel-in-progress: false
-    if: |
-      github.event_name == 'workflow_dispatch' || (
-        github.event_name == 'release' &&
-        !github.event.release.draft &&
-        (github.event.release.prerelease == true ||
-         github.event.release.make_latest == 'true' ||
-         github.event.release.make_latest == true ||
-         github.event.release.is_latest == true ||
-         github.event.release.is_latest == 'true')
-      )
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.release.draft == false)
 
     steps:
       - name: Debug event data
