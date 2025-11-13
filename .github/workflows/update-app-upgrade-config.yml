@@ -22,7 +22,6 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' || (
         github.event_name == 'release' &&
-        github.event.release &&
         !github.event.release.draft &&
         (github.event.release.prerelease == true ||
          github.event.release.make_latest == 'true' ||
@@ -32,6 +31,16 @@ jobs:
       )
 
     steps:
+      - name: Debug event data
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Event action: ${{ github.event.action }}"
+          echo "Release draft: ${{ github.event.release.draft }}"
+          echo "Release prerelease: ${{ github.event.release.prerelease }}"
+          echo "Release make_latest: ${{ github.event.release.make_latest }}"
+          echo "Release is_latest: ${{ github.event.release.is_latest }}"
+          echo "Release tag: ${{ github.event.release.tag_name }}"
+
       - name: Prepare metadata
         id: meta
         run: |
