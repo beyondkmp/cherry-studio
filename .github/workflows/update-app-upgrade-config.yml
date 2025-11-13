@@ -3,6 +3,7 @@ name: Update App Upgrade Config
 on:
   release:
     types:
+      - published
       - released
       - prereleased
   workflow_dispatch:
