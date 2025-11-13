@@ -24,13 +24,10 @@ jobs:
       github.event_name == 'release' &&
       github.event.release &&
       !github.event.release.draft &&
-      (
-        (github.event.action == 'prereleased' && github.event.release.prerelease) ||
-        ((github.event.action == 'released' || github.event.action == 'published') &&
-          (github.event.release.make_latest == 'true' ||
-            github.event.release.is_latest == true ||
-            github.event.release.is_latest == 'true'))
-      )) }}
+      (github.event.release.prerelease == true ||
+       github.event.release.make_latest == 'true' ||
+       github.event.release.is_latest == true)
+    ) }}
 
     steps:
       - name: Prepare metadata
