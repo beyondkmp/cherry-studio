@@ -3,13 +3,12 @@ name: Update App Upgrade Config
 on:
   release:
     types:
-      - published
       - released
       - prereleased
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g., v1.2.3)'
+        description: "Release tag (e.g., v1.2.3)"
         required: true
         type: string
 
