@@ -26,7 +26,9 @@ jobs:
         !github.event.release.draft &&
         (github.event.release.prerelease == true ||
          github.event.release.make_latest == 'true' ||
-         github.event.release.is_latest == true)
+         github.event.release.make_latest == true ||
+         github.event.release.is_latest == true ||
+         github.event.release.is_latest == 'true')
       )
 
     steps:
