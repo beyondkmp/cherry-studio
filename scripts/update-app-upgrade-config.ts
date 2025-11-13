@@ -7,10 +7,13 @@ type UpdateMirror = 'github' | 'gitcode'
 
 const CHANNELS: UpgradeChannel[] = ['latest', 'rc', 'beta']
 const MIRRORS: UpdateMirror[] = ['github', 'gitcode']
+const GITHUB_REPO = 'beyondkmp/cherry-studio'
+const GITCODE_REPO = 'beyondkmp/cherry-studio'
 const DEFAULT_FEED_TEMPLATES: Record<UpdateMirror, string> = {
-  github: 'https://github.com/beyondkmp/cherry-studio/releases/download/{{tag}}',
-  gitcode: 'https://gitcode.com/beyondkmp/cherry-studio/releases/download/{{tag}}'
+  github: `https://github.com/${GITHUB_REPO}/releases/download/{{tag}}`,
+  gitcode: `https://gitcode.com/${GITCODE_REPO}/releases/download/{{tag}}`
 }
+const GITCODE_LATEST_FALLBACK = 'https://releases.cherry-ai.com'
 
 interface CliOptions {
   tag?: string
@@ -397,9 +400,15 @@ async function applyChannelUpdate(
       `[update-app-upgrade-config] Skipping release availability validation for ${releaseInfo.version} (${releaseInfo.channel}).`
     )
   } else {
-    const releaseReady = await ensureReleaseAvailability(releaseInfo)
-    if (!releaseReady) {
+    const availability = await ensureReleaseAvailability(releaseInfo)
+    if (!availability.github) {
       return false
+    }
+    if (releaseInfo.channel === 'latest' && !availability.gitcode) {
+      console.warn(
+        `[update-app-upgrade-config] gitcode release page not ready for ${releaseInfo.tag}. Falling back to ${GITCODE_LATEST_FALLBACK}.`
+      )
+      feedUrls.gitcode = GITCODE_LATEST_FALLBACK
     }
   }
 
@@ -445,11 +454,20 @@ function sortVersionMap(versions: Record<string, VersionEntry>): Record<string, 
   )
 }
 
-async function ensureReleaseAvailability(releaseInfo: ReleaseInfo): Promise<boolean> {
+interface ReleaseAvailability {
+  github: boolean
+  gitcode: boolean
+}
+
+async function ensureReleaseAvailability(releaseInfo: ReleaseInfo): Promise<ReleaseAvailability> {
   const mirrorsToCheck: UpdateMirror[] = releaseInfo.channel === 'latest' ? MIRRORS : ['github']
+  const availability: ReleaseAvailability = {
+    github: false,
+    gitcode: releaseInfo.channel === 'latest' ? false : true
+  }
 
   for (const mirror of mirrorsToCheck) {
-    const url = getReleasePageUrl(mirror, releaseInfo.tag, releaseInfo.channel)
+    const url = getReleasePageUrl(mirror, releaseInfo.tag)
     try {
       const response = await fetch(url, {
         method: 'HEAD',
@@ -457,27 +475,28 @@ async function ensureReleaseAvailability(releaseInfo: ReleaseInfo): Promise<bool
       })
 
       if (response.status === 404) {
-        console.warn(
-          `[update-app-upgrade-config] ${mirror} release page missing for ${releaseInfo.tag} (${url}). Skipping update.`
-        )
-        return false
+        console.warn(`[update-app-upgrade-config] ${mirror} release page missing for ${releaseInfo.tag} (${url}).`)
+        availability[mirror] = false
+      } else {
+        availability[mirror] = true
       }
     } catch (error) {
       console.warn(
         `[update-app-upgrade-config] Failed to verify ${mirror} release page for ${releaseInfo.tag} (${url}). Continuing.`,
         error
       )
+      availability[mirror] = false
     }
   }
 
-  return true
+  return availability
 }
 
-function getReleasePageUrl(mirror: UpdateMirror, tag: string, channel: UpgradeChannel): string {
-  if (mirror === 'github' || channel !== 'latest') {
-    return `https://github.com/beyondkmp/cherry-studio/releases/tag/${encodeURIComponent(tag)}`
+function getReleasePageUrl(mirror: UpdateMirror, tag: string): string {
+  if (mirror === 'github') {
+    return `https://github.com/${GITHUB_REPO}/releases/tag/${encodeURIComponent(tag)}`
   }
-  return `https://gitcode.com/beyondkmp/cherry-studio/releases/${encodeURIComponent(tag)}`
+  return `https://gitcode.com/${GITCODE_REPO}/releases/${encodeURIComponent(tag)}`
 }
 
 main().catch((error) => {
