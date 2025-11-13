@@ -6,6 +6,7 @@ on:
       - prereleased
       - released
       - published
+      - edited
   workflow_dispatch:
     inputs:
       tag:
@@ -20,14 +21,15 @@ permissions:
 jobs:
   propose-update:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (
-      github.event_name == 'release' &&
-      github.event.release &&
-      !github.event.release.draft &&
-      (github.event.release.prerelease == true ||
-       github.event.release.make_latest == 'true' ||
-       github.event.release.is_latest == true)
-    ) }}
+    if: |
+      github.event_name == 'workflow_dispatch' || (
+        github.event_name == 'release' &&
+        github.event.release &&
+        !github.event.release.draft &&
+        (github.event.release.prerelease == true ||
+         github.event.release.make_latest == 'true' ||
+         github.event.release.is_latest == true)
+      )
 
     steps:
       - name: Prepare metadata
