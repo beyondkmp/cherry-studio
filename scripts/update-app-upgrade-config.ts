@@ -519,8 +519,8 @@ function getReleasePageUrl(mirror: UpdateMirror, tag: string): string {
   if (mirror === 'github') {
     return `https://github.com/${GITHUB_REPO}/releases/tag/${encodeURIComponent(tag)}`
   }
-  // Use archive download URL for GitCode since release page returns 200 even when not exists
-  return `https://raw.gitcode.com/${GITCODE_REPO}/archive/refs/heads/${encodeURIComponent(tag)}.zip`
+  // Use latest.yml download URL for GitCode to check if release exists (returns 404 if not exists)
+  return `https://gitcode.com/${GITCODE_REPO}/releases/download/${encodeURIComponent(tag)}/latest.yml`
 }
 
 main().catch((error) => {
