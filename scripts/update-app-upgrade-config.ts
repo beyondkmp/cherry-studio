@@ -423,18 +423,16 @@ async function applyChannelUpdate(
       `[update-app-upgrade-config] Skipping release availability validation for ${releaseInfo.version} (${releaseInfo.channel}).`
     )
   } else {
-    const githubAvailable = await ensureGithubReleaseAvailability(releaseInfo)
-    if (!githubAvailable) {
+    const availability = await ensureReleaseAvailability(releaseInfo)
+    if (!availability.github) {
       return false
     }
-  }
-
-  // For latest channel, always use fallback for gitcode
-  if (releaseInfo.channel === 'latest') {
-    console.warn(
-      `[update-app-upgrade-config] Using GitCode fallback for ${releaseInfo.tag}: ${GITCODE_LATEST_FALLBACK}`
-    )
-    feedUrls.gitcode = GITCODE_LATEST_FALLBACK
+    if (releaseInfo.channel === 'latest' && !availability.gitcode) {
+      console.warn(
+        `[update-app-upgrade-config] gitcode release page not ready for ${releaseInfo.tag}. Falling back to ${GITCODE_LATEST_FALLBACK}.`
+      )
+      feedUrls.gitcode = GITCODE_LATEST_FALLBACK
+    }
   }
 
   entry.channels[releaseInfo.channel] = {
@@ -479,29 +477,53 @@ function sortVersionMap(versions: Record<string, VersionEntry>): Record<string, 
   )
 }
 
-async function ensureGithubReleaseAvailability(releaseInfo: ReleaseInfo): Promise<boolean> {
-  const url = `https://github.com/${GITHUB_REPO}/releases/tag/${encodeURIComponent(releaseInfo.tag)}`
-  try {
-    const response = await fetch(url, {
-      method: 'HEAD',
-      redirect: 'follow'
-    })
+interface ReleaseAvailability {
+  github: boolean
+  gitcode: boolean
+}
 
-    if (response.ok) {
-      return true
-    } else {
-      console.warn(
-        `[update-app-upgrade-config] GitHub release not available for ${releaseInfo.tag} (status ${response.status}, ${url}).`
-      )
-      return false
-    }
-  } catch (error) {
-    console.warn(
-      `[update-app-upgrade-config] Failed to verify GitHub release page for ${releaseInfo.tag} (${url}). Continuing.`,
-      error
-    )
-    return false
+async function ensureReleaseAvailability(releaseInfo: ReleaseInfo): Promise<ReleaseAvailability> {
+  const mirrorsToCheck: UpdateMirror[] = releaseInfo.channel === 'latest' ? MIRRORS : ['github']
+  const availability: ReleaseAvailability = {
+    github: false,
+    gitcode: releaseInfo.channel === 'latest' ? false : true
   }
+
+  for (const mirror of mirrorsToCheck) {
+    const url = getReleasePageUrl(mirror, releaseInfo.tag)
+    try {
+      const response = await fetch(url, {
+        method: mirror === 'github' ? 'HEAD' : 'GET',
+        redirect: 'follow'
+      })
+
+      if (response.ok) {
+        availability[mirror] = true
+      } else {
+        console.warn(
+          `[update-app-upgrade-config] ${mirror} release not available for ${releaseInfo.tag} (status ${response.status}, ${url}).`
+        )
+        availability[mirror] = false
+      }
+    } catch (error) {
+      console.warn(
+        `[update-app-upgrade-config] Failed to verify ${mirror} release page for ${releaseInfo.tag} (${url}). Continuing.`,
+        error
+      )
+      availability[mirror] = false
+    }
+  }
+
+  return availability
+}
+
+function getReleasePageUrl(mirror: UpdateMirror, tag: string): string {
+  if (mirror === 'github') {
+    return `https://github.com/${GITHUB_REPO}/releases/tag/${encodeURIComponent(tag)}`
+  }
+  // Use latest.yml download URL for GitCode to check if release exists
+  // Note: GitCode returns 401 for HEAD requests, so we use GET in ensureReleaseAvailability
+  return `https://gitcode.com/${GITCODE_REPO}/releases/download/${encodeURIComponent(tag)}/latest.yml`
 }
 
 main().catch((error) => {
