@@ -12,7 +12,7 @@
         "latest": {
           "feedTemplates": {
             "github": "https://github.com/CherryHQ/cherry-studio/releases/download/{{tag}}",
-            "gitcode": "https://gitcode.com/beyondkmp/cherry-studio/releases/{{tag}}"
+            "gitcode": "https://gitcode.com/CherryHQ/cherry-studio/releases/download/{{tag}}"
           }
         },
         "rc": {

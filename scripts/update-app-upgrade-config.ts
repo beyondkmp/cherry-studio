@@ -497,11 +497,13 @@ async function ensureReleaseAvailability(releaseInfo: ReleaseInfo): Promise<Rele
         redirect: 'follow'
       })
 
-      if (response.status === 404) {
-        console.warn(`[update-app-upgrade-config] ${mirror} release page missing for ${releaseInfo.tag} (${url}).`)
-        availability[mirror] = false
-      } else {
+      if (response.ok) {
         availability[mirror] = true
+      } else {
+        console.warn(
+          `[update-app-upgrade-config] ${mirror} release not available for ${releaseInfo.tag} (status ${response.status}, ${url}).`
+        )
+        availability[mirror] = false
       }
     } catch (error) {
       console.warn(
