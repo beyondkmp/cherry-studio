@@ -21,6 +21,7 @@ interface CliOptions {
   segmentsPath?: string
   dryRun?: boolean
   skipReleaseChecks?: boolean
+  isPrerelease?: boolean
 }
 
 interface ChannelTemplateConfig {
@@ -92,6 +93,25 @@ async function main() {
   if (!releaseChannel) {
     console.warn(`[update-app-upgrade-config] Tag ${normalizedVersion} does not map to beta/rc/latest. Skipping.`)
     return
+  }
+
+  // Validate version format matches prerelease status
+  if (options.isPrerelease !== undefined) {
+    const hasPrereleaseSuffix = releaseChannel === 'beta' || releaseChannel === 'rc'
+
+    if (options.isPrerelease && !hasPrereleaseSuffix) {
+      console.warn(
+        `[update-app-upgrade-config] ⚠️  Release marked as prerelease but version ${normalizedVersion} has no beta/rc suffix. Skipping.`
+      )
+      return
+    }
+
+    if (!options.isPrerelease && hasPrereleaseSuffix) {
+      console.warn(
+        `[update-app-upgrade-config] ⚠️  Release marked as latest but version ${normalizedVersion} has prerelease suffix (${releaseChannel}). Skipping.`
+      )
+      return
+    }
   }
 
   const [config, segmentFile] = await Promise.all([
@@ -167,6 +187,9 @@ function parseArgs(): CliOptions {
       options.dryRun = true
     } else if (arg === '--skip-release-checks') {
       options.skipReleaseChecks = true
+    } else if (arg === '--is-prerelease') {
+      options.isPrerelease = args[i + 1] === 'true'
+      i += 1
     } else if (arg === '--help') {
       printHelp()
       process.exit(0)
@@ -189,6 +212,7 @@ Options:
   --tag <tag>         Release tag (e.g. v2.1.6). Falls back to GITHUB_REF_NAME/RELEASE_TAG.
   --config <path>     Path to app-upgrade-config.json.
   --segments <path>   Path to app-upgrade-segments.json.
+  --is-prerelease <true|false>  Whether this is a prerelease (validates version format).
   --dry-run           Print the result without writing to disk.
   --skip-release-checks  Skip release page availability checks (only valid with --dry-run).
   --help              Show this help message.`)

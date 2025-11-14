@@ -30,36 +30,18 @@ jobs:
           # workflow_dispatch always proceeds
           if [ "$EVENT" = "workflow_dispatch" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           TAG="${{ github.event.release.tag_name }}"
           IS_PRERELEASE="${{ github.event.release.prerelease }}"
 
-          # Check if version has prerelease suffix (beta/rc/alpha)
-          HAS_PRERELEASE_SUFFIX=false
-          if [[ "$TAG" =~ -(beta|rc|alpha) ]]; then
-            HAS_PRERELEASE_SUFFIX=true
-          fi
-
           # If GitHub release is prerelease
           if [ "$IS_PRERELEASE" = "true" ]; then
-            # Prerelease must have beta/rc suffix in version
-            if [ "$HAS_PRERELEASE_SUFFIX" = "true" ]; then
-              echo "should_run=true" >> "$GITHUB_OUTPUT"
-              echo "Release is prerelease with valid suffix (beta/rc), proceeding"
-            else
-              echo "should_run=false" >> "$GITHUB_OUTPUT"
-              echo "⚠️  Release marked as prerelease but version $TAG has no beta/rc suffix, skipping"
-            fi
-            exit 0
-          fi
-
-          # If GitHub release is not prerelease, check if it's latest
-          # Also ensure version doesn't have prerelease suffix
-          if [ "$HAS_PRERELEASE_SUFFIX" = "true" ]; then
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            echo "⚠️  Release not marked as prerelease but version $TAG has prerelease suffix, skipping"
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "Release is prerelease, proceeding"
             exit 0
           fi
 
@@ -75,9 +57,11 @@ jobs:
 
           if [[ "${latest_tag}" == "$TAG" ]]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             echo "Release is latest, proceeding"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             echo "Release is neither prerelease nor latest, skipping"
           fi
 
@@ -156,10 +140,12 @@ jobs:
         working-directory: main
         env:
           RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          IS_PRERELEASE: ${{ steps.check.outputs.is_prerelease }}
         run: |
           yarn tsx scripts/update-app-upgrade-config.ts \
             --tag "$RELEASE_TAG" \
-            --config ../cs/app-upgrade-config.json
+            --config ../cs/app-upgrade-config.json \
+            --is-prerelease "$IS_PRERELEASE"
 
       - name: Detect changes
         if: steps.check.outputs.should_run == 'true'
