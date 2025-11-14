@@ -1,6 +1,25 @@
 {
-  "lastUpdated": "2025-11-13T09:10:57.524Z",
+  "lastUpdated": "2025-11-14T02:47:07.570Z",
   "versions": {
+    "2.0.1": {
+      "minCompatibleVersion": "2.0.0",
+      "description": "Current latest v2.x release",
+      "channels": {
+        "latest": {
+          "version": "2.0.1",
+          "feedUrls": {
+            "github": "https://github.com/CherryHQ/cherry-studio/releases/download/v2.0.1",
+            "gitcode": "https://gitcode.com/CherryHQ/cherry-studio/releases/download/v2.0.1"
+          }
+        },
+        "rc": null,
+        "beta": null
+      },
+      "metadata": {
+        "segmentId": "current-v2",
+        "segmentType": "latest"
+      }
+    },
     "2.0.0": {
       "metadata": {
         "segmentId": "gateway-v2",
