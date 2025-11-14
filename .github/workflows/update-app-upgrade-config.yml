@@ -3,7 +3,6 @@ name: Update App Upgrade Config
 on:
   release:
     types:
-      - published
       - released
       - prereleased
   workflow_dispatch:
@@ -20,7 +19,7 @@ permissions:
 jobs:
   propose-update:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.release.draft == false && (github.event.release.prerelease == true || github.event.release.is_latest || github.event.release.make_latest))
+    #if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.release.draft == false && (github.event.release.prerelease == true || github.event.release.is_latest || github.event.release.make_latest))
 
     steps:
       - name: Debug event data
