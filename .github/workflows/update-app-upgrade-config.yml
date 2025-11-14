@@ -22,19 +22,62 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.release.draft == false)
 
     steps:
+      - name: Check if should proceed
+        id: check
+        run: |
+          EVENT="${{ github.event_name }}"
+
+          # workflow_dispatch always proceeds
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Check if prerelease
+          if [ "${{ github.event.release.prerelease }}" = "true" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "Release is prerelease, proceeding"
+            exit 0
+          fi
+
+          # Check if latest via API
+          latest_tag=$(
+            curl -L \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ github.token }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/${{ github.repository }}/releases/latest \
+              | jq -r '.tag_name'
+          )
+
+          if [[ "${latest_tag}" == "${{ github.event.release.tag_name }}" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "Release is latest, proceeding"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Release is neither prerelease nor latest, skipping"
+          fi
 
       - name: Prepare metadata
         id: meta
+        if: steps.check.outputs.should_run == 'true'
         run: |
           EVENT="${{ github.event_name }}"
           if [ "$EVENT" = "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
             PRE="${{ github.event.release.prerelease }}"
-            MAKE_LATEST="${{ github.event.release.make_latest }}"
-            IS_LATEST_RAW="${{ github.event.release.is_latest }}"
-            if [ "$MAKE_LATEST" = "true" ]; then
-              LATEST="true"
-            elif [ "$IS_LATEST_RAW" = "true" ] || [ "$IS_LATEST_RAW" = "True" ]; then
+
+            # Determine if latest via API
+            latest_tag=$(
+              curl -L \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer ${{ github.token }}" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                https://api.github.com/repos/${{ github.repository }}/releases/latest \
+                | jq -r '.tag_name'
+            )
+
+            if [[ "${latest_tag}" == "$TAG" ]]; then
               LATEST="true"
             else
               LATEST="false"
@@ -55,6 +98,7 @@ jobs:
           echo "trigger=$TRIGGER" >> "$GITHUB_OUTPUT"
 
       - name: Checkout default branch
+        if: steps.check.outputs.should_run == 'true'
         uses: actions/checkout@v5
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -62,6 +106,7 @@ jobs:
           fetch-depth: 0
 
       - name: Checkout cs-releases branch
+        if: steps.check.outputs.should_run == 'true'
         uses: actions/checkout@v5
         with:
           ref: cs-releases
@@ -69,18 +114,22 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
+        if: steps.check.outputs.should_run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Enable Corepack
+        if: steps.check.outputs.should_run == 'true'
         run: corepack enable && corepack prepare yarn@4.9.1 --activate
 
       - name: Install dependencies
+        if: steps.check.outputs.should_run == 'true'
         working-directory: main
         run: yarn install --immutable
 
       - name: Update upgrade config
+        if: steps.check.outputs.should_run == 'true'
         working-directory: main
         env:
           RELEASE_TAG: ${{ steps.meta.outputs.tag }}
@@ -90,6 +139,7 @@ jobs:
             --config ../cs/app-upgrade-config.json
 
       - name: Detect changes
+        if: steps.check.outputs.should_run == 'true'
         id: diff
         working-directory: cs
         run: |
@@ -100,7 +150,7 @@ jobs:
           fi
 
       - name: Create pull request
-        if: steps.diff.outputs.changed == 'true'
+        if: steps.check.outputs.should_run == 'true' && steps.diff.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
           path: cs
@@ -120,5 +170,5 @@ jobs:
             app-upgrade
 
       - name: No changes detected
-        if: steps.diff.outputs.changed != 'true'
+        if: steps.check.outputs.should_run == 'true' && steps.diff.outputs.changed != 'true'
         run: echo "No updates required for cs-releases/app-upgrade-config.json"
