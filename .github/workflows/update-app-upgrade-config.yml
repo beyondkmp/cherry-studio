@@ -11,6 +11,11 @@ on:
         description: "Release tag (e.g., v1.2.3)"
         required: true
         type: string
+      is_prerelease:
+        description: "Mark the tag as a prerelease when running manually"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -27,25 +32,12 @@ jobs:
         run: |
           EVENT="${{ github.event_name }}"
 
-          # workflow_dispatch always proceeds
           if [ "$EVENT" = "workflow_dispatch" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${{ github.event.release.tag_name }}"
           fi
 
-          TAG="${{ github.event.release.tag_name }}"
-          IS_PRERELEASE="${{ github.event.release.prerelease }}"
-
-          # If GitHub release is prerelease
-          if [ "$IS_PRERELEASE" = "true" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
-            echo "Release is prerelease, proceeding"
-            exit 0
-          fi
-
-          # Check if latest via API
           latest_tag=$(
             curl -L \
               -H "Accept: application/vnd.github+json" \
@@ -55,13 +47,36 @@ jobs:
               | jq -r '.tag_name'
           )
 
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            MANUAL_IS_PRERELEASE="${{ github.event.inputs.is_prerelease }}"
+            if [ -z "$MANUAL_IS_PRERELEASE" ]; then
+              MANUAL_IS_PRERELEASE="false"
+            fi
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=$MANUAL_IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+            echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          IS_PRERELEASE="${{ github.event.release.prerelease }}"
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+            echo "Release is prerelease, proceeding"
+            exit 0
+          fi
+
           if [[ "${latest_tag}" == "$TAG" ]]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
             echo "Release is latest, proceeding"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
             echo "Release is neither prerelease nor latest, skipping"
           fi
 
@@ -70,21 +85,12 @@ jobs:
         if: steps.check.outputs.should_run == 'true'
         run: |
           EVENT="${{ github.event_name }}"
+          LATEST_TAG="${{ steps.check.outputs.latest_tag }}"
           if [ "$EVENT" = "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
             PRE="${{ github.event.release.prerelease }}"
 
-            # Determine if latest via API
-            latest_tag=$(
-              curl -L \
-                -H "Accept: application/vnd.github+json" \
-                -H "Authorization: Bearer ${{ github.token }}" \
-                -H "X-GitHub-Api-Version: 2022-11-28" \
-                https://api.github.com/repos/${{ github.repository }}/releases/latest \
-                | jq -r '.tag_name'
-            )
-
-            if [[ "${latest_tag}" == "$TAG" ]]; then
+            if [ -n "$LATEST_TAG" ] && [ "$LATEST_TAG" = "$TAG" ]; then
               LATEST="true"
             else
               LATEST="false"
@@ -92,8 +98,15 @@ jobs:
             TRIGGER="release"
           else
             TAG="${{ github.event.inputs.tag }}"
-            PRE="false"
-            LATEST="true"
+            PRE="${{ github.event.inputs.is_prerelease }}"
+            if [ -z "$PRE" ]; then
+              PRE="false"
+            fi
+            if [ -n "$LATEST_TAG" ] && [ "$LATEST_TAG" = "$TAG" ] && [ "$PRE" != "true" ]; then
+              LATEST="true"
+            else
+              LATEST="false"
+            fi
             TRIGGER="manual"
           fi
 

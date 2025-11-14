@@ -142,10 +142,9 @@ async function main() {
   )
 
   if (!updated) {
-    console.warn(
-      `[update-app-upgrade-config] Skipped updating config for ${releaseInfo.version} (${releaseInfo.channel}) because feed URLs are not ready.`
+    throw new Error(
+      `[update-app-upgrade-config] Feed URLs are not ready for ${releaseInfo.version} (${releaseInfo.channel}). Try again after the release mirrors finish syncing.`
     )
-    return
   }
 
   const updatedConfig: UpgradeConfigFile = {
