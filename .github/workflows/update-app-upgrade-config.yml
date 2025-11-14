@@ -52,6 +52,15 @@ jobs:
             if [ -z "$MANUAL_IS_PRERELEASE" ]; then
               MANUAL_IS_PRERELEASE="false"
             fi
+            if [ "$MANUAL_IS_PRERELEASE" = "true" ]; then
+              if ! echo "$TAG" | grep -E '(-beta([.-][0-9]+)?|-rc([.-][0-9]+)?)' >/dev/null; then
+                echo "Manual prerelease flag set but tag $TAG lacks beta/rc suffix. Skipping." >&2
+                echo "should_run=false" >> "$GITHUB_OUTPUT"
+                echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+                echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=$MANUAL_IS_PRERELEASE" >> "$GITHUB_OUTPUT"
             echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
@@ -61,6 +70,13 @@ jobs:
           IS_PRERELEASE="${{ github.event.release.prerelease }}"
 
           if [ "$IS_PRERELEASE" = "true" ]; then
+            if ! echo "$TAG" | grep -E '(-beta([.-][0-9]+)?|-rc([.-][0-9]+)?)' >/dev/null; then
+              echo "Release marked as prerelease but tag $TAG lacks beta/rc suffix. Skipping." >&2
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+              echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
             echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
