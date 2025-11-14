@@ -519,7 +519,8 @@ function getReleasePageUrl(mirror: UpdateMirror, tag: string): string {
   if (mirror === 'github') {
     return `https://github.com/${GITHUB_REPO}/releases/tag/${encodeURIComponent(tag)}`
   }
-  return `https://gitcode.com/${GITCODE_REPO}/releases/${encodeURIComponent(tag)}`
+  // Use archive download URL for GitCode since release page returns 200 even when not exists
+  return `https://gitcode.com/${GITCODE_REPO}/archive/refs/tags/${encodeURIComponent(tag)}.zip`
 }
 
 main().catch((error) => {
