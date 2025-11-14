@@ -33,10 +33,33 @@ jobs:
             exit 0
           fi
 
-          # Check if prerelease
-          if [ "${{ github.event.release.prerelease }}" = "true" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "Release is prerelease, proceeding"
+          TAG="${{ github.event.release.tag_name }}"
+          IS_PRERELEASE="${{ github.event.release.prerelease }}"
+
+          # Check if version has prerelease suffix (beta/rc/alpha)
+          HAS_PRERELEASE_SUFFIX=false
+          if [[ "$TAG" =~ -(beta|rc|alpha) ]]; then
+            HAS_PRERELEASE_SUFFIX=true
+          fi
+
+          # If GitHub release is prerelease
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            # Prerelease must have beta/rc suffix in version
+            if [ "$HAS_PRERELEASE_SUFFIX" = "true" ]; then
+              echo "should_run=true" >> "$GITHUB_OUTPUT"
+              echo "Release is prerelease with valid suffix (beta/rc), proceeding"
+            else
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              echo "⚠️  Release marked as prerelease but version $TAG has no beta/rc suffix, skipping"
+            fi
+            exit 0
+          fi
+
+          # If GitHub release is not prerelease, check if it's latest
+          # Also ensure version doesn't have prerelease suffix
+          if [ "$HAS_PRERELEASE_SUFFIX" = "true" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️  Release not marked as prerelease but version $TAG has prerelease suffix, skipping"
             exit 0
           fi
 
@@ -50,7 +73,7 @@ jobs:
               | jq -r '.tag_name'
           )
 
-          if [[ "${latest_tag}" == "${{ github.event.release.tag_name }}" ]]; then
+          if [[ "${latest_tag}" == "$TAG" ]]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "Release is latest, proceeding"
           else
