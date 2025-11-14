@@ -8,7 +8,7 @@ type UpdateMirror = 'github' | 'gitcode'
 const CHANNELS: UpgradeChannel[] = ['latest', 'rc', 'beta']
 const MIRRORS: UpdateMirror[] = ['github', 'gitcode']
 const GITHUB_REPO = 'beyondkmp/cherry-studio'
-const GITCODE_REPO = 'CherryHQ/cherry-studio'
+const GITCODE_REPO = 'beyondkmp/cherry-studio'
 const DEFAULT_FEED_TEMPLATES: Record<UpdateMirror, string> = {
   github: `https://github.com/${GITHUB_REPO}/releases/download/{{tag}}`,
   gitcode: `https://gitcode.com/${GITCODE_REPO}/releases/download/{{tag}}`
