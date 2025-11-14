@@ -8,7 +8,7 @@ type UpdateMirror = 'github' | 'gitcode'
 const CHANNELS: UpgradeChannel[] = ['latest', 'rc', 'beta']
 const MIRRORS: UpdateMirror[] = ['github', 'gitcode']
 const GITHUB_REPO = 'beyondkmp/cherry-studio'
-const GITCODE_REPO = 'beyondkmp/cherry-studio'
+const GITCODE_REPO = 'CherryHQ/cherry-studio'
 const DEFAULT_FEED_TEMPLATES: Record<UpdateMirror, string> = {
   github: `https://github.com/${GITHUB_REPO}/releases/download/{{tag}}`,
   gitcode: `https://gitcode.com/${GITCODE_REPO}/releases/download/{{tag}}`
@@ -520,7 +520,7 @@ function getReleasePageUrl(mirror: UpdateMirror, tag: string): string {
     return `https://github.com/${GITHUB_REPO}/releases/tag/${encodeURIComponent(tag)}`
   }
   // Use archive download URL for GitCode since release page returns 200 even when not exists
-  return `https://gitcode.com/${GITCODE_REPO}/archive/refs/tags/${encodeURIComponent(tag)}.zip`
+  return `https://raw.gitcode.com/${GITCODE_REPO}/archive/refs/heads/${encodeURIComponent(tag)}.zip`
 }
 
 main().catch((error) => {
