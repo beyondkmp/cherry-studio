@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-11-13T09:10:57.524Z",
+  "lastUpdated": "2025-11-14T03:30:16.624Z",
   "versions": {
     "2.0.0": {
       "metadata": {
@@ -30,10 +30,10 @@
           }
         },
         "rc": {
-          "version": "1.6.0-rc.5",
+          "version": "1.7.19-rc.1",
           "feedUrls": {
-            "github": "https://github.com/CherryHQ/cherry-studio/releases/download/v1.6.0-rc.5",
-            "gitcode": "https://github.com/CherryHQ/cherry-studio/releases/download/v1.6.0-rc.5"
+            "github": "https://github.com/CherryHQ/cherry-studio/releases/download/v1.7.19-rc.1",
+            "gitcode": "https://github.com/CherryHQ/cherry-studio/releases/download/v1.7.19-rc.1"
           }
         },
         "beta": {
