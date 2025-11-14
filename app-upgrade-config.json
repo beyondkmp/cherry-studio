@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-11-13T09:10:57.524Z",
+  "lastUpdated": "2025-11-14T02:41:37.122Z",
   "versions": {
     "2.0.0": {
       "metadata": {
@@ -9,7 +9,13 @@
       "minCompatibleVersion": "1.7.0",
       "description": "Major release v2.0 - required intermediate version for v2.x upgrades",
       "channels": {
-        "latest": null,
+        "latest": {
+          "version": "2.0.0",
+          "feedUrls": {
+            "github": "https://github.com/CherryHQ/cherry-studio/releases/download/v2.0.0",
+            "gitcode": "https://gitcode.com/CherryHQ/cherry-studio/releases/download/v2.0.0"
+          }
+        },
         "rc": null,
         "beta": null
       }
